@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The League Ledger</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Libre+Franklin:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Space+Mono:wght@400;700&display=swap');
+
+:root{
+  --field-dark: #16281C;
+  --field: #23492F;
+  --field-light: #2F5E3C;
+  --chalk: #F4EFE3;
+  --chalk-dim: #D8D0BC;
+  --leather: #6E4526;
+  --leather-light: #8A5A34;
+  --flag: #E3A23C;
+  --flag-bright: #F0B75A;
+  --score-red: #B33A32;
+  --ink: #12201A;
+  --line: rgba(244,239,227,0.16);
+}
+
+*{box-sizing:border-box; margin:0; padding:0;}
+
+body{
+  font-family:'Libre Franklin', sans-serif;
+  background:
+    repeating-linear-gradient(90deg, rgba(244,239,227,0.035) 0px, rgba(244,239,227,0.035) 2px, transparent 2px, transparent 90px),
+    linear-gradient(180deg, var(--field-dark) 0%, var(--field) 45%, var(--field-dark) 100%);
+  color: var(--chalk);
+  min-height:100vh;
+  padding-bottom: 60px;
+}
+
+.wrap{ max-width: 980px; margin:0 auto; padding: 0 20px; }
+
+/* HEADER */
+header.masthead{
+  padding: 38px 20px 22px;
+  text-align:center;
+  border-bottom: 3px solid var(--flag);
+  position:relative;
+}
+header.masthead::before, header.masthead::after{
+  content:"";
+  position:absolute;
+  top:0; bottom:0;
+  width: 14px;
+  background: repeating-linear-gradient(180deg, var(--flag) 0 18px, transparent 18px 32px);
+}
+header.masthead::before{ left: 8px; }
+header.masthead::after{ right: 8px; }
+
+.lock-bar{
+  position:absolute;
+  top: 16px;
+  right: 30px;
+  z-index: 5;
+}
+.lock-btn{
+  font-family:'Space Mono', monospace;
+  font-size: 11px;
+  font-weight:700;
+  letter-spacing:0.04em;
+  text-transform: uppercase;
+  background: rgba(244,239,227,0.08);
+  border: 1px solid var(--line);
+  color: var(--chalk-dim);
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor:pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.lock-btn:hover{ background: rgba(244,239,227,0.14); }
+.lock-btn.unlocked{ color: var(--ink); background: var(--flag); border-color: var(--flag); }
+
+.lock-field[readonly], .lock-action:disabled{
+  opacity: 0.6;
+  cursor: default;
+}
+.lock-action:disabled{ cursor: not-allowed; }
+
+/* COMMISSIONER LOGIN MODAL */
+.modal-overlay{
+  display:none;
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 16, 12, 0.72);
+  z-index: 100;
+  align-items:center;
+  justify-content:center;
+  padding: 20px;
+}
+.modal-overlay.show{ display:flex; }
+.modal-card{
+  width: 100%;
+  max-width: 340px;
+  background: var(--field-dark);
+  border: 1px solid var(--flag);
+  border-radius: 8px;
+  padding: 26px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.modal-title{
+  font-family:'Anton', sans-serif;
+  font-size: 22px;
+  color: var(--flag-bright);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.modal-desc{
+  font-family:'Space Mono', monospace;
+  font-size: 12px;
+  color: var(--chalk-dim);
+  margin-bottom: 18px;
+  line-height: 1.6;
+}
+.modal-input{
+  width:100%;
+  font-family:'Libre Franklin', sans-serif;
+  font-size: 15px;
+  padding: 11px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: rgba(244,239,227,0.06);
+  color: var(--chalk);
+  margin-bottom: 10px;
+}
+.modal-input:focus{ outline:none; border-color: var(--flag); }
+.modal-error{
+  font-family:'Space Mono', monospace;
+  font-size: 12px;
+  color: var(--score-red);
+  min-height: 16px;
+  margin-bottom: 10px;
+}
+.modal-actions{
+  display:flex;
+  gap: 10px;
+  justify-content:flex-end;
+}
+.modal-cancel{
+  font-family:'Space Mono', monospace;
+  font-size: 12px;
+  font-weight:700;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--chalk-dim);
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor:pointer;
+}
+.modal-cancel:hover{ background: rgba(244,239,227,0.06); }
+
+.eyebrow{
+  font-family:'Space Mono', monospace;
+  letter-spacing: 0.35em;
+  font-size: 11px;
+  color: var(--flag-bright);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.league-name{
+  font-family:'Anton', sans-serif;
+  font-size: clamp(38px, 7vw, 68px);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 0.95;
+  color: var(--chalk);
+  text-shadow: 3px 3px 0 var(--ink);
+}
+.league-name span{ color: var(--flag-bright); }
+.sub{
+  margin-top: 10px;
+  font-family:'Space Mono', monospace;
+  font-size: 13px;
+  color: var(--chalk-dim);
+}
+
+/* TAB BAR */
+nav.tabs{
+  position: sticky; top:0; z-index: 20;
+  background: var(--field-dark);
+  border-bottom: 2px solid var(--line);
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: thin;
+  scrollbar-color: var(--leather) transparent;
+}
+nav.tabs::-webkit-scrollbar{ height: 6px; }
+nav.tabs::-webkit-scrollbar-thumb{ background: var(--leather); border-radius: 3px; }
+
+.tabs-inner{ display:flex; }
+.tab-btn{
+  flex: 0 0 auto;
+  font-family:'Space Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--chalk-dim);
+  background: transparent;
+  border:none;
+  border-right: 1px solid var(--line);
+  padding: 14px 16px;
+  cursor:pointer;
+  transition: background .15s, color .15s;
+}
+.tab-btn:hover{ background: rgba(244,239,227,0.06); color: var(--chalk); }
+.tab-btn.active{
+  color: var(--ink);
+  background: var(--flag);
+}
+.tab-btn.home-tab{ color: var(--flag-bright); }
+.tab-btn.home-tab.active{ color: var(--ink); }
+
+/* PANELS */
+main{ padding-top: 30px; }
+.panel{ display:none; }
+.panel.active{ display:block; }
+
+/* HOME: BEER MILE LEADERBOARD */
+.section-title{
+  font-family:'Anton', sans-serif;
+  font-size: 28px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--flag-bright);
+  margin-bottom: 4px;
+}
+.section-desc{
+  font-family:'Space Mono', monospace;
+  font-size: 12.5px;
+  color: var(--chalk-dim);
+  margin-bottom: 22px;
+}
+
+/* HOME: STANDINGS */
+.standings-table{
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 8px;
+}
+.standings-table th{
+  font-family:'Space Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--chalk-dim);
+  text-align:left;
+  padding: 8px 10px;
+  border-bottom: 2px solid var(--flag);
+}
+.standings-table th.num, .standings-table td.num{ text-align:center; width: 44px; }
+.standings-table td{
+  font-family:'Libre Franklin', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--chalk);
+}
+.standings-table td.num{ font-family:'Space Mono', monospace; font-weight:700; }
+.standings-table tr.rank-1 td{ color: var(--flag-bright); }
+.standings-table td.rank-cell{
+  font-family:'Anton', sans-serif;
+  font-size: 15px;
+  color: var(--chalk-dim);
+  width: 30px;
+}
+.standings-table tr.rank-1 td.rank-cell{ color: var(--flag-bright); }
+
+/* HOME: BEER MILE LEADERBOARD (condensed) */
+.mug-board{
+  display:flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.mug-chip{
+  display:flex;
+  align-items:center;
+  gap: 8px;
+  background: rgba(244,239,227,0.05);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px 6px 14px;
+  max-width: 100%;
+}
+.mug-chip.rank-1{ border-color: var(--flag); background: rgba(227,162,60,0.10); }
+
+.chip-name{
+  font-family:'Libre Franklin', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--chalk);
+  background: transparent;
+  border: none;
+  width: auto;
+  max-width: 140px;
+  padding: 2px 0;
+}
+.chip-name:focus{ outline:none; }
+
+.chip-mugs{ display:flex; flex-wrap:wrap; gap: 2px; align-items:center; max-width: 160px; }
+.mini-mug{ flex: 0 0 auto; }
+.zero-note{
+  font-family:'Space Mono', monospace;
+  font-size: 11px;
+  color: var(--chalk-dim);
+  font-style: italic;
+  white-space:nowrap;
+}
+
+.chip-actions{ display:none; gap:4px; }
+body.is-editor .chip-actions{ display:flex; }
+
+.pill-btn{
+  font-family:'Space Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid var(--line);
+  background: rgba(244,239,227,0.06);
+  color: var(--chalk);
+  border-radius: 999px;
+  width: 22px; height: 22px;
+  cursor:pointer;
+  transition: background .15s, transform .1s;
+}
+.pill-btn:hover{ background: var(--leather-light); }
+.pill-btn:active{ transform: scale(0.92); }
+.pill-btn.del{ color: var(--score-red); font-size: 13px; }
+
+.add-participant{
+  display:none;
+  gap:10px; margin-top: 4px;
+}
+body.is-editor .add-participant{ display:flex; }
+.add-participant input{
+  flex:1;
+  font-family:'Libre Franklin', sans-serif;
+  font-size: 14px;
+  padding: 11px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: rgba(244,239,227,0.05);
+  color: var(--chalk);
+}
+.add-participant input::placeholder{ color: var(--chalk-dim); }
+.add-participant input:focus{ outline: none; border-color: var(--flag); }
+.btn-primary{
+  font-family:'Space Mono', monospace;
+  font-weight:700;
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: var(--flag);
+  color: var(--ink);
+  border: none;
+  padding: 0 20px;
+  border-radius: 6px;
+  cursor:pointer;
+  transition: background .15s;
+}
+.btn-primary:hover{ background: var(--flag-bright); }
+
+.empty-state{
+  font-family:'Space Mono', monospace;
+  font-size: 13px;
+  color: var(--chalk-dim);
+  padding: 20px;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  text-align:center;
+}
+
+.rule{
+  border:none;
+  border-top: 1px solid var(--line);
+  margin: 34px 0;
+}
+
+/* WEEK PANELS */
+.week-header{
+  display:flex;
+  align-items:baseline;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.week-num{
+  font-family:'Anton', sans-serif;
+  font-size: 54px;
+  color: var(--flag);
+  line-height: 1;
+}
+.week-label{
+  font-family:'Space Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--chalk-dim);
+}
+
+.matchup-card{
+  background: rgba(244,239,227,0.05);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 22px;
+  margin-bottom: 20px;
+}
+
+.scoreboard{
+  display:grid;
+  grid-template-columns: 1fr 70px auto 70px 1fr;
+  align-items:center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.team-field{
+  font-family:'Libre Franklin', sans-serif;
+  font-weight: 800;
+  font-size: 17px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  color: var(--chalk);
+  padding: 6px 2px;
+  width: 100%;
+}
+.team-field.right{ text-align:right; }
+.team-field:focus{ outline:none; border-bottom-color: var(--flag); }
+
+.score-field{
+  font-family:'Anton', sans-serif;
+  font-size: 30px;
+  text-align:center;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--flag-bright);
+  padding: 4px 0;
+  width: 100%;
+}
+.score-field:focus{ outline:none; border-color: var(--flag); }
+
+.vs-mark{
+  font-family:'Space Mono', monospace;
+  font-size: 12px;
+  color: var(--chalk-dim);
+  text-align:center;
+  letter-spacing:0.1em;
+}
+
+.recap-label{
+  font-family:'Space Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--flag-bright);
+  margin-bottom: 8px;
+}
+.recap-text{
+  width:100%;
+  min-height: 130px;
+  font-family:'Libre Franklin', sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--chalk);
+  background: rgba(0,0,0,0.18);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 14px;
+  resize: vertical;
+}
+.recap-text::placeholder{ color: var(--chalk-dim); font-style: italic; }
+.recap-text:focus{ outline:none; border-color: var(--flag); }
+
+.loading-note{
+  font-family:'Space Mono', monospace;
+  font-size: 12px;
+  color: var(--chalk-dim);
+  text-align:center;
+  padding: 40px 0;
+}
+
+.game-label{
+  font-family:'Space Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--chalk-dim);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+@media (max-width: 560px){
+  .mug-chip{ width: 100%; }
+  .chip-name{ max-width: none; flex:1; }
+  .scoreboard{ grid-template-columns: 1fr; text-align:center; }
+  .team-field.right{ text-align:center; }
+  .vs-mark{ margin: 2px 0; }
+  .standings-table th, .standings-table td{ padding: 8px 6px; font-size: 13px; }
+}
+
+:focus-visible{ outline: 2px solid var(--flag-bright); outline-offset: 2px; }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="lock-bar">
+    <button class="lock-btn" id="lockToggleBtn" type="button">🔒 Commissioner login</button>
+  </div>
+  <div class="eyebrow">Est. this season &middot; every loss remembered</div>
+  <div class="league-name">THE LEAGUE <span>LEDGER</span></div>
+  <div class="sub">Mile High Club</div>
+</header>
+
+<nav class="tabs">
+  <div class="tabs-inner" id="tabsInner"></div>
+</nav>
+
+<div class="modal-overlay" id="loginModal">
+  <div class="modal-card">
+    <div class="modal-title">Commissioner Login</div>
+    <div class="modal-desc">Enter the passphrase to unlock editing for this session.</div>
+    <input type="password" id="passphraseInput" class="modal-input" placeholder="Passphrase" autocomplete="off">
+    <div class="modal-error" id="passphraseError"></div>
+    <div class="modal-actions">
+      <button type="button" class="modal-cancel" id="passphraseCancel">Cancel</button>
+      <button type="button" class="btn-primary" id="passphraseSubmit">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<main class="wrap">
+  <div class="panel active" id="panel-home">
+    <div class="section-title">League Standings</div>
+    <div class="section-desc">// records update automatically from your weekly recaps.</div>
+
+    <div id="standingsWrap"></div>
+
+    <hr class="rule">
+
+    <div class="section-title">Beer Mile Leaderboard</div>
+    <div class="section-desc">// one mug per mile owed. tap + when a debt gets paid.</div>
+
+    <div class="mug-board" id="leaderboard"></div>
+
+    <div class="add-participant">
+      <input type="text" id="newParticipant" class="lock-field" readonly placeholder="Add a league member&hellip;" maxlength="40">
+      <button class="btn-primary lock-action" id="addParticipantBtn" disabled>Add</button>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-rules">
+    <div class="section-title">Season Rules</div>
+    <div class="section-desc">// the law of the league. commissioner edits, everyone reads.</div>
+
+    <div class="matchup-card">
+      <textarea class="recap-text lock-field" id="rulesText" readonly style="min-height: 420px;" placeholder="Draft order, scoring settings, waiver rules, tiebreakers, punishments — write it all here."></textarea>
+    </div>
+  </div>
+
+  <!-- Week panels injected by JS -->
+  <div id="weekPanels"></div>
+</main>
+
+<script>
+(function(){
+  const TOTAL_WEEKS = 16;
+  const tabsInner = document.getElementById('tabsInner');
+  const weekPanelsRoot = document.getElementById('weekPanels');
+  const leaderboardEl = document.getElementById('leaderboard');
+
+  // ---------- Commissioner lock ----------
+  // NOTE: this is a simple UI-level gate, not real security — anyone who opens
+  // the browser console could still bypass it. Change the passphrase below to
+  // something only you know, and treat it as a courtesy lock for your league,
+  // not a secure login.
+  const EDIT_PASSPHRASE = 'commissioner';
+  let isEditor = false;
+
+  function applyLockState(){
+    document.querySelectorAll('.lock-field').forEach(el => { el.readOnly = !isEditor; });
+    document.querySelectorAll('.lock-action').forEach(el => { el.disabled = !isEditor; });
+    document.body.classList.toggle('is-editor', isEditor);
+    const btn = document.getElementById('lockToggleBtn');
+    if(btn){
+      btn.textContent = isEditor ? '🔓 Editing unlocked' : '🔒 Commissioner login';
+      btn.classList.toggle('unlocked', isEditor);
+    }
+  }
+
+  document.getElementById('lockToggleBtn').addEventListener('click', ()=>{
+    if(isEditor){
+      isEditor = false;
+      applyLockState();
+      return;
+    }
+    openLoginModal();
+  });
+
+  const loginModal = document.getElementById('loginModal');
+  const passphraseInput = document.getElementById('passphraseInput');
+  const passphraseError = document.getElementById('passphraseError');
+
+  function openLoginModal(){
+    passphraseInput.value = '';
+    passphraseError.textContent = '';
+    loginModal.classList.add('show');
+    setTimeout(()=> passphraseInput.focus(), 50);
+  }
+
+  function closeLoginModal(){
+    loginModal.classList.remove('show');
+  }
+
+  function attemptLogin(){
+    if(passphraseInput.value === EDIT_PASSPHRASE){
+      isEditor = true;
+      applyLockState();
+      closeLoginModal();
+    }else{
+      passphraseError.textContent = 'Incorrect passphrase — try again.';
+      passphraseInput.value = '';
+      passphraseInput.focus();
+    }
+  }
+
+  document.getElementById('passphraseSubmit').addEventListener('click', attemptLogin);
+  document.getElementById('passphraseCancel').addEventListener('click', closeLoginModal);
+  passphraseInput.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') attemptLogin();
+    if(e.key === 'Escape') closeLoginModal();
+  });
+  loginModal.addEventListener('click', (e)=>{
+    if(e.target === loginModal) closeLoginModal();
+  });
+
+  // ---------- Build tabs ----------
+  const homeTabBtn = document.createElement('button');
+  homeTabBtn.className = 'tab-btn home-tab active';
+  homeTabBtn.textContent = 'HOME';
+  homeTabBtn.dataset.target = 'panel-home';
+  tabsInner.appendChild(homeTabBtn);
+
+  const rulesTabBtn = document.createElement('button');
+  rulesTabBtn.className = 'tab-btn';
+  rulesTabBtn.textContent = 'RULES';
+  rulesTabBtn.dataset.target = 'panel-rules';
+  tabsInner.appendChild(rulesTabBtn);
+
+  for(let w=1; w<=TOTAL_WEEKS; w++){
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn';
+    btn.textContent = 'WK ' + w;
+    btn.dataset.target = 'panel-week-' + w;
+    tabsInner.appendChild(btn);
+  }
+
+  tabsInner.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.tab-btn');
+    if(!btn) return;
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.target).classList.add('active');
+    if(btn.dataset.target === 'panel-home') computeStandings();
+  });
+
+  // ---------- Build week panels ----------
+  const GAMES_PER_WEEK = 6;
+  const weekLoadPromises = [];
+
+  for(let w=1; w<=TOTAL_WEEKS; w++){
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    panel.id = 'panel-week-' + w;
+
+    let cardsHtml = '';
+    for(let g=1; g<=GAMES_PER_WEEK; g++){
+      cardsHtml += `
+      <div class="matchup-card" data-game="${g}">
+        <div class="game-label">Game ${g} of ${GAMES_PER_WEEK}</div>
+        <div class="scoreboard">
+          <input class="team-field lock-field" readonly data-field="teamA" placeholder="Team name" maxlength="30">
+          <input class="score-field lock-field" readonly data-field="scoreA" placeholder="0" inputmode="decimal">
+          <div class="vs-mark">VS</div>
+          <input class="score-field lock-field" readonly data-field="scoreB" placeholder="0" inputmode="decimal">
+          <input class="team-field right lock-field" readonly data-field="teamB" placeholder="Team name" maxlength="30">
+        </div>
+        <div class="recap-label">The Recap</div>
+        <textarea class="recap-text lock-field" readonly data-field="recap" placeholder="How'd it go? Any last-second heroics, waiver-wire heists, or bench blunders worth recording for the league record?"></textarea>
+      </div>`;
+    }
+
+    panel.innerHTML = `
+      <div class="week-header">
+        <div class="week-num">${String(w).padStart(2,'0')}</div>
+        <div class="week-label">Week ${w} &middot; Matchup Recaps</div>
+      </div>
+      ${cardsHtml}
+    `;
+    weekPanelsRoot.appendChild(panel);
+
+    let saveTimer = null;
+    panel.querySelectorAll('[data-field]').forEach(field=>{
+      field.addEventListener('input', ()=>{
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(()=> saveWeek(w, panel), 500);
+        if(field.dataset.field !== 'recap') computeStandings();
+      });
+    });
+
+    weekLoadPromises.push(loadWeek(w, panel));
+  }
+
+  applyLockState();
+  Promise.all(weekLoadPromises).then(computeStandings);
+
+  async function saveWeek(w, panel){
+    const games = Array.from(panel.querySelectorAll('.matchup-card')).map(card=>{
+      const data = {};
+      card.querySelectorAll('[data-field]').forEach(f=>{
+        data[f.dataset.field] = f.value;
+      });
+      return data;
+    });
+    try{
+      await window.storage.set('week-' + w, JSON.stringify(games), true);
+    }catch(err){
+      console.error('Storage error', err);
+    }
+  }
+
+  async function loadWeek(w, panel){
+    try{
+      const res = await window.storage.get('week-' + w, true);
+      if(res && res.value){
+        const games = JSON.parse(res.value);
+        const cards = panel.querySelectorAll('.matchup-card');
+        cards.forEach((card, idx)=>{
+          const data = games[idx];
+          if(!data) return;
+          card.querySelectorAll('[data-field]').forEach(f=>{
+            if(data[f.dataset.field] !== undefined) f.value = data[f.dataset.field];
+          });
+        });
+      }
+    }catch(err){
+      // no data yet for this week — that's fine
+    }
+  }
+
+  // ---------- Standings ----------
+  const standingsWrap = document.getElementById('standingsWrap');
+
+  function computeStandings(){
+    const records = {};
+
+    function ensureTeam(name){
+      if(!records[name]) records[name] = { name, w:0, l:0, t:0, pf:0, pa:0 };
+    }
+
+    for(let w=1; w<=TOTAL_WEEKS; w++){
+      const panel = document.getElementById('panel-week-' + w);
+      if(!panel) continue;
+      panel.querySelectorAll('.matchup-card').forEach(card=>{
+        const teamA = card.querySelector('[data-field="teamA"]').value.trim();
+        const teamB = card.querySelector('[data-field="teamB"]').value.trim();
+        const scoreA = parseFloat(card.querySelector('[data-field="scoreA"]').value);
+        const scoreB = parseFloat(card.querySelector('[data-field="scoreB"]').value);
+        if(!teamA || !teamB || isNaN(scoreA) || isNaN(scoreB)) return;
+
+        ensureTeam(teamA);
+        ensureTeam(teamB);
+        records[teamA].pf += scoreA; records[teamA].pa += scoreB;
+        records[teamB].pf += scoreB; records[teamB].pa += scoreA;
+
+        if(scoreA > scoreB){ records[teamA].w++; records[teamB].l++; }
+        else if(scoreB > scoreA){ records[teamB].w++; records[teamA].l++; }
+        else{ records[teamA].t++; records[teamB].t++; }
+      });
+    }
+
+    renderStandings(Object.values(records));
+  }
+
+  function renderStandings(teams){
+    if(teams.length === 0){
+      standingsWrap.innerHTML = `<div class="empty-state">No results yet. Fill in team names and scores on the week tabs and standings will build themselves.</div>`;
+      return;
+    }
+    const hasTies = teams.some(t => t.t > 0);
+    teams.sort((a,b)=> (b.w - a.w) || ((b.pf - b.pa) - (a.pf - a.pa)));
+
+    const rows = teams.map((t, idx)=> `
+      <tr class="${idx === 0 ? 'rank-1' : ''}">
+        <td class="rank-cell">${idx+1}</td>
+        <td>${escapeHtml(t.name)}</td>
+        <td class="num">${t.w}</td>
+        <td class="num">${t.l}</td>
+        ${hasTies ? `<td class="num">${t.t}</td>` : ''}
+      </tr>
+    `).join('');
+
+    standingsWrap.innerHTML = `
+      <table class="standings-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Team</th>
+            <th class="num">W</th>
+            <th class="num">L</th>
+            ${hasTies ? '<th class="num">T</th>' : ''}
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  // ---------- Beer mile leaderboard ----------
+  let participants = [];
+
+  function fullMugSVG(){
+    return `
+      <svg class="mini-mug" width="15" height="15" viewBox="0 0 30 30">
+        <rect x="4" y="4" width="16" height="20" rx="2" fill="var(--flag)" stroke="var(--chalk-dim)" stroke-width="1"/>
+        <rect x="6" y="6" width="12" height="2.5" fill="#fff" opacity="0.85"/>
+        <path d="M20 8 h4 a2 2 0 0 1 2 2 v6 a2 2 0 0 1 -2 2 h-4" fill="none" stroke="var(--chalk-dim)" stroke-width="1.5"/>
+      </svg>
+    `;
+  }
+
+  function renderLeaderboard(){
+    if(participants.length === 0){
+      leaderboardEl.innerHTML = `<div class="empty-state">No one's on the board yet. Add your league members below to start tracking beer miles.</div>`;
+      return;
+    }
+    const sorted = [...participants].sort((a,b)=> b.miles - a.miles);
+
+    leaderboardEl.innerHTML = sorted.map((p, idx)=>{
+      const rankClass = idx === 0 && p.miles > 0 ? 'rank-1' : '';
+      const mugs = p.miles > 0
+        ? Array.from({length: p.miles}).map(()=> fullMugSVG()).join('')
+        : `<span class="zero-note">clean tab</span>`;
+      return `
+        <div class="mug-chip ${rankClass}" data-id="${p.id}">
+          <input class="chip-name lock-field" readonly value="${escapeHtml(p.name)}" data-action="rename" maxlength="30">
+          <div class="chip-mugs">${mugs}</div>
+          <div class="chip-actions">
+            <button class="pill-btn lock-action" disabled data-action="minus" title="Remove a mile">&minus;</button>
+            <button class="pill-btn lock-action" disabled data-action="plus" title="Add a mile">+</button>
+            <button class="pill-btn del lock-action" disabled data-action="delete" title="Remove from board">&times;</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    applyLockState();
+  }
+
+  function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  async function saveParticipants(){
+    try{
+      await window.storage.set('participants', JSON.stringify(participants), true);
+    }catch(err){
+      console.error('Storage error', err);
+    }
+  }
+
+  async function loadParticipants(){
+    leaderboardEl.innerHTML = `<div class="loading-note">Loading the board&hellip;</div>`;
+    try{
+      const res = await window.storage.get('participants', true);
+      participants = res && res.value ? JSON.parse(res.value) : [];
+    }catch(err){
+      participants = [];
+    }
+    renderLeaderboard();
+  }
+
+  leaderboardEl.addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-action]');
+    if(!btn) return;
+    const row = e.target.closest('.mug-chip');
+    const id = row.dataset.id;
+    const p = participants.find(x=>x.id === id);
+    if(!p) return;
+
+    if(btn.dataset.action === 'plus'){
+      p.miles += 1;
+    }else if(btn.dataset.action === 'minus'){
+      p.miles = Math.max(0, p.miles - 1);
+    }else if(btn.dataset.action === 'delete'){
+      participants = participants.filter(x=>x.id !== id);
+    }
+    saveParticipants();
+    renderLeaderboard();
+  });
+
+  leaderboardEl.addEventListener('change', (e)=>{
+    if(e.target.dataset.action !== 'rename') return;
+    const row = e.target.closest('.mug-chip');
+    const id = row.dataset.id;
+    const p = participants.find(x=>x.id === id);
+    if(!p) return;
+    p.name = e.target.value.trim() || 'Unnamed';
+    saveParticipants();
+  });
+
+  document.getElementById('addParticipantBtn').addEventListener('click', addParticipant);
+  document.getElementById('newParticipant').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') addParticipant();
+  });
+
+  function addParticipant(){
+    const input = document.getElementById('newParticipant');
+    const name = input.value.trim();
+    if(!name) return;
+    participants.push({ id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7), name, miles: 0 });
+    input.value = '';
+    saveParticipants();
+    renderLeaderboard();
+  }
+
+  // ---------- Season rules ----------
+  const rulesText = document.getElementById('rulesText');
+  let rulesSaveTimer = null;
+
+  rulesText.addEventListener('input', ()=>{
+    clearTimeout(rulesSaveTimer);
+    rulesSaveTimer = setTimeout(saveRules, 500);
+  });
+
+  async function saveRules(){
+    try{
+      await window.storage.set('season-rules', rulesText.value, true);
+    }catch(err){
+      console.error('Storage error', err);
+    }
+  }
+
+  async function loadRules(){
+    try{
+      const res = await window.storage.get('season-rules', true);
+      if(res && res.value !== undefined) rulesText.value = res.value;
+    }catch(err){
+      // no rules saved yet — that's fine
+    }
+  }
+
+  loadRules();
+  loadParticipants();
+})();
+</script>
+
+</body>
+</html>
