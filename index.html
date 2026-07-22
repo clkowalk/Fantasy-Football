@@ -247,6 +247,12 @@ nav.tabs::-webkit-scrollbar-thumb{ background: var(--leather); border-radius: 3p
 .tab-btn.home-tab{ color: var(--flag-bright); }
 .tab-btn.home-tab.active{ color: var(--ink); }
 
+.tab-btn.current-week:not(.active){
+  color: var(--flag-bright);
+  background: rgba(227,162,60,0.14);
+  box-shadow: inset 0 -3px 0 var(--flag);
+}
+
 /* PANELS */
 main{ padding-top: 30px; }
 .panel{ display:none; }
@@ -531,9 +537,33 @@ body.is-editor .add-participant{ display:flex; }
 @media (max-width: 560px){
   .mug-chip{ width: 100%; }
   .chip-name{ max-width: none; flex:1; }
-  .scoreboard{ grid-template-columns: 1fr; text-align:center; }
-  .team-field.right{ text-align:center; }
-  .vs-mark{ margin: 2px 0; }
+
+  .matchup-card{ padding: 16px 14px; margin-bottom: 14px; }
+  .game-label{ margin-bottom: 10px; padding-bottom: 6px; }
+
+  .scoreboard{
+    grid-template-columns: 1fr 64px;
+    grid-template-areas:
+      "teamA scoreA"
+      "vs vs"
+      "teamB scoreB";
+    gap: 6px 10px;
+    margin-bottom: 16px;
+  }
+  .scoreboard [data-field="teamA"]{ grid-area: teamA; text-align:left; font-size: 15px; }
+  .scoreboard [data-field="teamB"]{ grid-area: teamB; text-align:left; font-size: 15px; }
+  .scoreboard [data-field="scoreA"]{ grid-area: scoreA; font-size: 18px; padding: 3px 0; }
+  .scoreboard [data-field="scoreB"]{ grid-area: scoreB; font-size: 18px; padding: 3px 0; }
+  .scoreboard .vs-mark{
+    grid-area: vs;
+    text-align:left;
+    font-size: 10px;
+    opacity: 0.55;
+    margin: 0;
+  }
+
+  .recap-text{ min-height: 100px; }
+
   .standings-table th, .standings-table td{ padding: 8px 6px; font-size: 13px; }
   .lock-bar{ position: static; justify-content:center; margin-bottom: 14px; max-width: none; }
   header.masthead{ padding-top: 20px; }
@@ -684,7 +714,7 @@ body.is-editor .add-participant{ display:flex; }
         ? 'Local draft has unexported changes — export, then commit data.json to publish.'
         : 'Local draft matches your last export.';
     }else if(dataSource === 'published'){
-      el.textContent = 'Viewing published league data.';
+      el.textContent = '';
     }else{
       el.textContent = 'No published data.json found yet.';
     }
@@ -893,6 +923,7 @@ body.is-editor .add-participant{ display:flex; }
         updateWeekDataFromDOM(w, panel);
         scheduleSave();
         if(field.dataset.field !== 'recap') computeStandings();
+        else updateCurrentWeekHighlight();
       });
     });
   }
@@ -1085,6 +1116,23 @@ body.is-editor .add-participant{ display:flex; }
     scheduleSave();
   });
 
+  // ---------- Current week highlight ----------
+  // "Current week" = the latest week that has at least one recap written.
+  function updateCurrentWeekHighlight(){
+    let current = null;
+    for(let w=1; w<=TOTAL_WEEKS; w++){
+      const games = (siteData.weeks && siteData.weeks[w]) || [];
+      const hasRecap = games.some(g => g && g.recap && g.recap.trim().length > 0);
+      if(hasRecap) current = w;
+    }
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('current-week'));
+    if(current){
+      const btn = Array.from(document.querySelectorAll('.tab-btn'))
+        .find(b => b.dataset.target === 'panel-week-' + current);
+      if(btn) btn.classList.add('current-week');
+    }
+  }
+
   // ---------- Render everything from siteData ----------
   function renderAllFromSiteData(){
     siteData.participants = siteData.participants || [];
@@ -1095,6 +1143,7 @@ body.is-editor .add-participant{ display:flex; }
     rulesText.value = siteData.rules;
     for(let w=1; w<=TOTAL_WEEKS; w++) populateWeekPanel(w);
     computeStandings();
+    updateCurrentWeekHighlight();
     updateSyncStatus();
   }
 
