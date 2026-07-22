@@ -58,6 +58,8 @@ header.masthead::after{ right: 8px; }
   top: 16px;
   right: 30px;
   z-index: 5;
+  display:flex;
+  gap: 8px;
 }
 .lock-btn{
   font-family:'Space Mono', monospace;
@@ -75,6 +77,11 @@ header.masthead::after{ right: 8px; }
 }
 .lock-btn:hover{ background: rgba(244,239,227,0.14); }
 .lock-btn.unlocked{ color: var(--ink); background: var(--flag); border-color: var(--flag); }
+.lock-btn.spinning{ animation: spin-fade 0.6s ease; }
+@keyframes spin-fade{
+  0%{ opacity: 0.4; }
+  100%{ opacity: 1; }
+}
 
 .lock-field[readonly], .lock-action:disabled{
   opacity: 0.6;
@@ -504,6 +511,8 @@ body.is-editor .add-participant{ display:flex; }
   .team-field.right{ text-align:center; }
   .vs-mark{ margin: 2px 0; }
   .standings-table th, .standings-table td{ padding: 8px 6px; font-size: 13px; }
+  .lock-bar{ position: static; justify-content:center; margin-bottom: 14px; }
+  header.masthead{ padding-top: 20px; }
 }
 
 :focus-visible{ outline: 2px solid var(--flag-bright); outline-offset: 2px; }
@@ -513,6 +522,7 @@ body.is-editor .add-participant{ display:flex; }
 
 <header class="masthead">
   <div class="lock-bar">
+    <button class="lock-btn" id="refreshBtn" type="button" title="Pull the latest data">&#8635; Refresh</button>
     <button class="lock-btn" id="lockToggleBtn" type="button">🔒 Commissioner login</button>
   </div>
   <div class="eyebrow">Est. this season &middot; every loss remembered</div>
@@ -959,6 +969,49 @@ body.is-editor .add-participant{ display:flex; }
       // no rules saved yet — that's fine
     }
   }
+
+  // ---------- Keep viewers in sync ----------
+  // This page only reads shared data when it loads, so anyone who already had
+  // it open won't see a commissioner's edits until something pulls fresh data.
+  // We do that: on demand (Refresh button), whenever the tab regains focus,
+  // and on a light background timer. Skipped while actively logged in as
+  // commissioner, so it never overwrites something you're mid-typing.
+  let isRefreshing = false;
+
+  async function refreshAll(){
+    if(isRefreshing) return;
+    isRefreshing = true;
+    const btn = document.getElementById('refreshBtn');
+    if(btn) btn.classList.add('spinning');
+    try{
+      await loadParticipants();
+      await loadRules();
+      const promises = [];
+      for(let w=1; w<=TOTAL_WEEKS; w++){
+        const panel = document.getElementById('panel-week-' + w);
+        if(panel) promises.push(loadWeek(w, panel));
+      }
+      await Promise.all(promises);
+      computeStandings();
+    }catch(err){
+      console.error('Refresh error', err);
+    }finally{
+      isRefreshing = false;
+      if(btn) setTimeout(()=> btn.classList.remove('spinning'), 400);
+    }
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', refreshAll);
+
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'visible' && !isEditor) refreshAll();
+  });
+  window.addEventListener('focus', ()=>{
+    if(!isEditor) refreshAll();
+  });
+  setInterval(()=>{
+    if(!isEditor && document.visibilityState === 'visible') refreshAll();
+  }, 25000);
 
   loadRules();
   loadParticipants();
