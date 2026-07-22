@@ -1,5 +1,76 @@
 {
-  "participants": [],
-  "weeks": {},
+  "participants": [
+    {
+      "id": "p_1784735321929_5o90v",
+      "name": "Katie",
+      "miles": 2
+    },
+    {
+      "id": "p_1784735323840_lqt2i",
+      "name": "Chris",
+      "miles": 1
+    },
+    {
+      "id": "p_1784735331883_0uf3u",
+      "name": "Maddie",
+      "miles": 0
+    },
+    {
+      "id": "p_1784735335351_ylk0z",
+      "name": "Kevin",
+      "miles": 0
+    },
+    {
+      "id": "p_1784735339948_wcsmz",
+      "name": "Spob",
+      "miles": 0
+    }
+  ],
+  "weeks": {
+    "1": [
+      {
+        "teamA": "Katie",
+        "scoreA": "111",
+        "scoreB": "96",
+        "teamB": "Chris",
+        "recap": "Nice try bro."
+      },
+      {
+        "teamA": "",
+        "scoreA": "",
+        "scoreB": "",
+        "teamB": "",
+        "recap": ""
+      },
+      {
+        "teamA": "",
+        "scoreA": "",
+        "scoreB": "",
+        "teamB": "",
+        "recap": ""
+      },
+      {
+        "teamA": "",
+        "scoreA": "",
+        "scoreB": "",
+        "teamB": "",
+        "recap": ""
+      },
+      {
+        "teamA": "",
+        "scoreA": "",
+        "scoreB": "",
+        "teamB": "",
+        "recap": ""
+      },
+      {
+        "teamA": "",
+        "scoreA": "",
+        "scoreB": "",
+        "teamB": "",
+        "recap": ""
+      }
+    ]
+  },
   "rules": ""
 }
