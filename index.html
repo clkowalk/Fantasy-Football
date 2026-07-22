@@ -60,6 +60,9 @@ header.masthead::after{ right: 8px; }
   z-index: 5;
   display:flex;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 70%;
 }
 .lock-btn{
   font-family:'Space Mono', monospace;
@@ -81,6 +84,27 @@ header.masthead::after{ right: 8px; }
 @keyframes spin-fade{
   0%{ opacity: 0.4; }
   100%{ opacity: 1; }
+}
+
+.editor-only{ display:none; }
+body.is-editor .editor-only{ display:inline-flex; }
+.viewer-only{ display:inline-flex; }
+body.is-editor .viewer-only{ display:none; }
+
+.dirty-dot{
+  display:none;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--score-red);
+  margin-left: 6px;
+}
+.dirty-dot.show{ display:inline-block; }
+
+.sync-status{
+  margin-top: 8px;
+  font-family:'Space Mono', monospace;
+  font-size: 11px;
+  color: var(--chalk-dim);
 }
 
 .lock-field[readonly], .lock-action:disabled{
@@ -511,7 +535,7 @@ body.is-editor .add-participant{ display:flex; }
   .team-field.right{ text-align:center; }
   .vs-mark{ margin: 2px 0; }
   .standings-table th, .standings-table td{ padding: 8px 6px; font-size: 13px; }
-  .lock-bar{ position: static; justify-content:center; margin-bottom: 14px; }
+  .lock-bar{ position: static; justify-content:center; margin-bottom: 14px; max-width: none; }
   header.masthead{ padding-top: 20px; }
 }
 
@@ -522,12 +546,17 @@ body.is-editor .add-participant{ display:flex; }
 
 <header class="masthead">
   <div class="lock-bar">
-    <button class="lock-btn" id="refreshBtn" type="button" title="Pull the latest data">&#8635; Refresh</button>
+    <button class="lock-btn viewer-only" id="refreshBtn" type="button" title="Check for newly published data">&#8635; Refresh</button>
+    <button class="lock-btn editor-only" id="exportBtn" type="button">&#8681; Export JSON<span class="dirty-dot" id="dirtyDot"></span></button>
+    <button class="lock-btn editor-only" id="importBtn" type="button">&#8679; Import JSON</button>
+    <button class="lock-btn editor-only" id="resetBtn" type="button">&#8634; Reset to published</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none">
     <button class="lock-btn" id="lockToggleBtn" type="button">🔒 Commissioner login</button>
   </div>
   <div class="eyebrow">Est. this season &middot; every loss remembered</div>
   <div class="league-name">THE LEAGUE <span>LEDGER</span></div>
   <div class="sub">Mile High Club</div>
+  <div class="sync-status" id="syncStatus"></div>
 </header>
 
 <nav class="tabs">
@@ -587,11 +616,85 @@ body.is-editor .add-participant{ display:flex; }
   const weekPanelsRoot = document.getElementById('weekPanels');
   const leaderboardEl = document.getElementById('leaderboard');
 
+  // ---------- Data model ----------
+  // Everything lives in one in-memory object. On your PC it's mirrored into
+  // localStorage as you type (your "local draft"). Visitors have no local
+  // draft, so they always render whatever is in data.json — the file you
+  // export and commit to the repo.
+  const STORAGE_KEY = 'fantasy-league-data';
+  let siteData = { participants: [], weeks: {}, rules: '' };
+  let dataSource = 'empty'; // 'local' | 'published' | 'empty'
+  let isDirty = false;
+
+  function defaultData(){
+    return { participants: [], weeks: {}, rules: '' };
+  }
+
+  function loadLocalDraft(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(err){
+      console.error('Could not read local draft', err);
+      return null;
+    }
+  }
+
+  function saveLocalDraft(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(siteData));
+    }catch(err){
+      console.error('Could not write local draft', err);
+    }
+  }
+
+  async function fetchPublished(){
+    try{
+      const res = await fetch('./data.json', { cache: 'no-store' });
+      if(!res.ok) return null;
+      return await res.json();
+    }catch(err){
+      return null;
+    }
+  }
+
+  let saveTimer = null;
+  function scheduleSave(){
+    markDirty();
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveLocalDraft, 400);
+  }
+
+  function markDirty(){
+    isDirty = true;
+    updateSyncStatus();
+  }
+  function clearDirty(){
+    isDirty = false;
+    updateSyncStatus();
+  }
+
+  function updateSyncStatus(){
+    const el = document.getElementById('syncStatus');
+    const dot = document.getElementById('dirtyDot');
+    if(dot) dot.classList.toggle('show', isEditor && isDirty);
+    if(!el) return;
+    if(isEditor){
+      el.textContent = isDirty
+        ? 'Local draft has unexported changes — export, then commit data.json to publish.'
+        : 'Local draft matches your last export.';
+    }else if(dataSource === 'published'){
+      el.textContent = 'Viewing published league data.';
+    }else{
+      el.textContent = 'No published data.json found yet.';
+    }
+  }
+
   // ---------- Commissioner lock ----------
   // NOTE: this is a simple UI-level gate, not real security — anyone who opens
-  // the browser console could still bypass it. Change the passphrase below to
-  // something only you know, and treat it as a courtesy lock for your league,
-  // not a secure login.
+  // the browser console could still bypass it. On a GitHub-hosted site the
+  // real protection is that only you can push to the repo; treat this as a
+  // courtesy lock against accidental edits, not a secure login.
   const EDIT_PASSPHRASE = 'commissioner';
   let isEditor = false;
 
@@ -604,6 +707,7 @@ body.is-editor .add-participant{ display:flex; }
       btn.textContent = isEditor ? '🔓 Editing unlocked' : '🔒 Commissioner login';
       btn.classList.toggle('unlocked', isEditor);
     }
+    updateSyncStatus();
   }
 
   document.getElementById('lockToggleBtn').addEventListener('click', ()=>{
@@ -630,9 +734,17 @@ body.is-editor .add-participant{ display:flex; }
     loginModal.classList.remove('show');
   }
 
-  function attemptLogin(){
+  async function attemptLogin(){
     if(passphraseInput.value === EDIT_PASSPHRASE){
       isEditor = true;
+      // Resume a local draft if one exists on this machine; otherwise start
+      // the draft from whatever is currently published.
+      const draft = loadLocalDraft();
+      if(draft){
+        siteData = draft;
+        dataSource = 'local';
+      }
+      renderAllFromSiteData();
       applyLockState();
       closeLoginModal();
     }else{
@@ -650,6 +762,65 @@ body.is-editor .add-participant{ display:flex; }
   });
   loginModal.addEventListener('click', (e)=>{
     if(e.target === loginModal) closeLoginModal();
+  });
+
+  // ---------- Export / Import / Reset ----------
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    const blob = new Blob([JSON.stringify(siteData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'data.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    clearDirty();
+  });
+
+  const importFile = document.getElementById('importFile');
+  document.getElementById('importBtn').addEventListener('click', ()=> importFile.click());
+  importFile.addEventListener('change', ()=>{
+    const file = importFile.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      try{
+        const parsed = JSON.parse(e.target.result);
+        siteData = Object.assign(defaultData(), parsed);
+        dataSource = 'local';
+        saveLocalDraft();
+        renderAllFromSiteData();
+        clearDirty();
+      }catch(err){
+        console.error('Could not parse imported file', err);
+      }
+      importFile.value = '';
+    };
+    reader.readAsText(file);
+  });
+
+  let resetArmed = false, resetArmTimer = null;
+  const resetBtn = document.getElementById('resetBtn');
+  resetBtn.addEventListener('click', async ()=>{
+    if(!resetArmed){
+      resetArmed = true;
+      resetBtn.textContent = 'Confirm reset?';
+      resetArmTimer = setTimeout(()=>{
+        resetArmed = false;
+        resetBtn.textContent = '↺ Reset to published';
+      }, 4000);
+      return;
+    }
+    clearTimeout(resetArmTimer);
+    resetArmed = false;
+    resetBtn.textContent = '↺ Reset to published';
+    localStorage.removeItem(STORAGE_KEY);
+    const published = await fetchPublished();
+    siteData = published || defaultData();
+    dataSource = published ? 'published' : 'empty';
+    renderAllFromSiteData();
+    clearDirty();
   });
 
   // ---------- Build tabs ----------
@@ -683,9 +854,8 @@ body.is-editor .add-participant{ display:flex; }
     if(btn.dataset.target === 'panel-home') computeStandings();
   });
 
-  // ---------- Build week panels ----------
+  // ---------- Build week panels (skeletons only — data fills in after load) ----------
   const GAMES_PER_WEEK = 6;
-  const weekLoadPromises = [];
 
   for(let w=1; w<=TOTAL_WEEKS; w++){
     const panel = document.createElement('div');
@@ -718,22 +888,16 @@ body.is-editor .add-participant{ display:flex; }
     `;
     weekPanelsRoot.appendChild(panel);
 
-    let saveTimer = null;
     panel.querySelectorAll('[data-field]').forEach(field=>{
       field.addEventListener('input', ()=>{
-        clearTimeout(saveTimer);
-        saveTimer = setTimeout(()=> saveWeek(w, panel), 500);
+        updateWeekDataFromDOM(w, panel);
+        scheduleSave();
         if(field.dataset.field !== 'recap') computeStandings();
       });
     });
-
-    weekLoadPromises.push(loadWeek(w, panel));
   }
 
-  applyLockState();
-  Promise.all(weekLoadPromises).then(computeStandings);
-
-  async function saveWeek(w, panel){
+  function updateWeekDataFromDOM(w, panel){
     const games = Array.from(panel.querySelectorAll('.matchup-card')).map(card=>{
       const data = {};
       card.querySelectorAll('[data-field]').forEach(f=>{
@@ -741,30 +905,20 @@ body.is-editor .add-participant{ display:flex; }
       });
       return data;
     });
-    try{
-      await window.storage.set('week-' + w, JSON.stringify(games), true);
-    }catch(err){
-      console.error('Storage error', err);
-    }
+    siteData.weeks[w] = games;
   }
 
-  async function loadWeek(w, panel){
-    try{
-      const res = await window.storage.get('week-' + w, true);
-      if(res && res.value){
-        const games = JSON.parse(res.value);
-        const cards = panel.querySelectorAll('.matchup-card');
-        cards.forEach((card, idx)=>{
-          const data = games[idx];
-          if(!data) return;
-          card.querySelectorAll('[data-field]').forEach(f=>{
-            if(data[f.dataset.field] !== undefined) f.value = data[f.dataset.field];
-          });
-        });
-      }
-    }catch(err){
-      // no data yet for this week — that's fine
-    }
+  function populateWeekPanel(w){
+    const panel = document.getElementById('panel-week-' + w);
+    if(!panel) return;
+    const games = (siteData.weeks && siteData.weeks[w]) || [];
+    const cards = panel.querySelectorAll('.matchup-card');
+    cards.forEach((card, idx)=>{
+      const data = games[idx];
+      card.querySelectorAll('[data-field]').forEach(f=>{
+        f.value = data && data[f.dataset.field] !== undefined ? data[f.dataset.field] : '';
+      });
+    });
   }
 
   // ---------- Standings ----------
@@ -836,8 +990,6 @@ body.is-editor .add-participant{ display:flex; }
   }
 
   // ---------- Beer mile leaderboard ----------
-  let participants = [];
-
   function fullMugSVG(){
     return `
       <svg class="mini-mug" width="15" height="15" viewBox="0 0 30 30">
@@ -849,11 +1001,12 @@ body.is-editor .add-participant{ display:flex; }
   }
 
   function renderLeaderboard(){
-    if(participants.length === 0){
+    const list = siteData.participants || [];
+    if(list.length === 0){
       leaderboardEl.innerHTML = `<div class="empty-state">No one's on the board yet. Add your league members below to start tracking beer miles.</div>`;
       return;
     }
-    const sorted = [...participants].sort((a,b)=> b.miles - a.miles);
+    const sorted = [...list].sort((a,b)=> b.miles - a.miles);
 
     leaderboardEl.innerHTML = sorted.map((p, idx)=>{
       const rankClass = idx === 0 && p.miles > 0 ? 'rank-1' : '';
@@ -881,31 +1034,12 @@ body.is-editor .add-participant{ display:flex; }
     return d.innerHTML;
   }
 
-  async function saveParticipants(){
-    try{
-      await window.storage.set('participants', JSON.stringify(participants), true);
-    }catch(err){
-      console.error('Storage error', err);
-    }
-  }
-
-  async function loadParticipants(){
-    leaderboardEl.innerHTML = `<div class="loading-note">Loading the board&hellip;</div>`;
-    try{
-      const res = await window.storage.get('participants', true);
-      participants = res && res.value ? JSON.parse(res.value) : [];
-    }catch(err){
-      participants = [];
-    }
-    renderLeaderboard();
-  }
-
   leaderboardEl.addEventListener('click', (e)=>{
     const btn = e.target.closest('[data-action]');
     if(!btn) return;
     const row = e.target.closest('.mug-chip');
     const id = row.dataset.id;
-    const p = participants.find(x=>x.id === id);
+    const p = siteData.participants.find(x=>x.id === id);
     if(!p) return;
 
     if(btn.dataset.action === 'plus'){
@@ -913,9 +1047,9 @@ body.is-editor .add-participant{ display:flex; }
     }else if(btn.dataset.action === 'minus'){
       p.miles = Math.max(0, p.miles - 1);
     }else if(btn.dataset.action === 'delete'){
-      participants = participants.filter(x=>x.id !== id);
+      siteData.participants = siteData.participants.filter(x=>x.id !== id);
     }
-    saveParticipants();
+    scheduleSave();
     renderLeaderboard();
   });
 
@@ -923,10 +1057,10 @@ body.is-editor .add-participant{ display:flex; }
     if(e.target.dataset.action !== 'rename') return;
     const row = e.target.closest('.mug-chip');
     const id = row.dataset.id;
-    const p = participants.find(x=>x.id === id);
+    const p = siteData.participants.find(x=>x.id === id);
     if(!p) return;
     p.name = e.target.value.trim() || 'Unnamed';
-    saveParticipants();
+    scheduleSave();
   });
 
   document.getElementById('addParticipantBtn').addEventListener('click', addParticipant);
@@ -938,83 +1072,74 @@ body.is-editor .add-participant{ display:flex; }
     const input = document.getElementById('newParticipant');
     const name = input.value.trim();
     if(!name) return;
-    participants.push({ id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7), name, miles: 0 });
+    siteData.participants.push({ id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7), name, miles: 0 });
     input.value = '';
-    saveParticipants();
+    scheduleSave();
     renderLeaderboard();
   }
 
   // ---------- Season rules ----------
   const rulesText = document.getElementById('rulesText');
-  let rulesSaveTimer = null;
-
   rulesText.addEventListener('input', ()=>{
-    clearTimeout(rulesSaveTimer);
-    rulesSaveTimer = setTimeout(saveRules, 500);
+    siteData.rules = rulesText.value;
+    scheduleSave();
   });
 
-  async function saveRules(){
-    try{
-      await window.storage.set('season-rules', rulesText.value, true);
-    }catch(err){
-      console.error('Storage error', err);
-    }
-  }
+  // ---------- Render everything from siteData ----------
+  function renderAllFromSiteData(){
+    siteData.participants = siteData.participants || [];
+    siteData.weeks = siteData.weeks || {};
+    siteData.rules = siteData.rules || '';
 
-  async function loadRules(){
-    try{
-      const res = await window.storage.get('season-rules', true);
-      if(res && res.value !== undefined) rulesText.value = res.value;
-    }catch(err){
-      // no rules saved yet — that's fine
-    }
+    renderLeaderboard();
+    rulesText.value = siteData.rules;
+    for(let w=1; w<=TOTAL_WEEKS; w++) populateWeekPanel(w);
+    computeStandings();
+    updateSyncStatus();
   }
 
   // ---------- Keep viewers in sync ----------
-  // This page only reads shared data when it loads, so anyone who already had
-  // it open won't see a commissioner's edits until something pulls fresh data.
-  // We do that: on demand (Refresh button), whenever the tab regains focus,
-  // and on a light background timer. Skipped while actively logged in as
-  // commissioner, so it never overwrites something you're mid-typing.
-  let isRefreshing = false;
-
-  async function refreshAll(){
-    if(isRefreshing) return;
-    isRefreshing = true;
+  // Viewers have no local draft, so "refresh" just means re-fetching
+  // data.json in case you've pushed a newer version since the page loaded.
+  // Skipped while logged in as commissioner, so it never touches your draft.
+  async function refreshPublished(){
     const btn = document.getElementById('refreshBtn');
     if(btn) btn.classList.add('spinning');
-    try{
-      await loadParticipants();
-      await loadRules();
-      const promises = [];
-      for(let w=1; w<=TOTAL_WEEKS; w++){
-        const panel = document.getElementById('panel-week-' + w);
-        if(panel) promises.push(loadWeek(w, panel));
-      }
-      await Promise.all(promises);
-      computeStandings();
-    }catch(err){
-      console.error('Refresh error', err);
-    }finally{
-      isRefreshing = false;
-      if(btn) setTimeout(()=> btn.classList.remove('spinning'), 400);
+    const published = await fetchPublished();
+    if(published){
+      siteData = Object.assign(defaultData(), published);
+      dataSource = 'published';
+      renderAllFromSiteData();
     }
+    if(btn) setTimeout(()=> btn.classList.remove('spinning'), 400);
   }
 
-  document.getElementById('refreshBtn').addEventListener('click', refreshAll);
+  document.getElementById('refreshBtn').addEventListener('click', refreshPublished);
 
   document.addEventListener('visibilitychange', ()=>{
-    if(document.visibilityState === 'visible' && !isEditor) refreshAll();
+    if(document.visibilityState === 'visible' && !isEditor) refreshPublished();
   });
   window.addEventListener('focus', ()=>{
-    if(!isEditor) refreshAll();
+    if(!isEditor) refreshPublished();
   });
   setInterval(()=>{
-    if(!isEditor && document.visibilityState === 'visible') refreshAll();
+    if(!isEditor && document.visibilityState === 'visible') refreshPublished();
   }, 25000);
 
-  loadRules();
-  loadParticipants();
+  // ---------- Boot ----------
+  (async function bootstrap(){
+    const draft = loadLocalDraft();
+    if(draft){
+      siteData = Object.assign(defaultData(), draft);
+      dataSource = 'local';
+    }else{
+      const published = await fetchPublished();
+      siteData = published ? Object.assign(defaultData(), published) : defaultData();
+      dataSource = published ? 'published' : 'empty';
+    }
+    renderAllFromSiteData();
+    applyLockState();
+  })();
 })();
 </script>
 
