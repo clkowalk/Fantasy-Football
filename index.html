@@ -107,7 +107,7 @@ body.is-editor .viewer-only{ display:none; }
   color: var(--chalk-dim);
 }
 
-.lock-field[readonly], .lock-action:disabled{
+.lock-field[readonly], .lock-field:disabled, .lock-action:disabled{
   opacity: 0.6;
   cursor: default;
 }
@@ -258,6 +258,17 @@ main{ padding-top: 30px; }
 .panel{ display:none; }
 .panel.active{ display:block; }
 
+/* HOME: TWO-COLUMN LAYOUT */
+.home-columns{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+}
+.home-col:first-child{
+  border-right: 1px solid var(--line);
+  padding-right: 40px;
+}
+
 /* HOME: BEER MILE LEADERBOARD */
 .section-title{
   font-family:'Anton', sans-serif;
@@ -312,7 +323,7 @@ main{ padding-top: 30px; }
 /* HOME: BEER MILE LEADERBOARD (condensed) */
 .mug-board{
   display:flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 10px;
   margin-bottom: 18px;
 }
@@ -325,7 +336,7 @@ main{ padding-top: 30px; }
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 6px 10px 6px 14px;
-  max-width: 100%;
+  width: 100%;
 }
 .mug-chip.rank-1{ border-color: var(--flag); background: rgba(227,162,60,0.10); }
 
@@ -336,13 +347,13 @@ main{ padding-top: 30px; }
   color: var(--chalk);
   background: transparent;
   border: none;
-  width: auto;
-  max-width: 140px;
+  flex: 1 1 auto;
+  min-width: 60px;
   padding: 2px 0;
 }
 .chip-name:focus{ outline:none; }
 
-.chip-mugs{ display:flex; flex-wrap:wrap; gap: 2px; align-items:center; max-width: 160px; }
+.chip-mugs{ display:flex; flex-wrap:wrap; gap: 2px; align-items:center; justify-content:flex-end; flex: 0 1 auto; }
 .mini-mug{ flex: 0 0 auto; }
 .zero-note{
   font-family:'Space Mono', monospace;
@@ -352,7 +363,7 @@ main{ padding-top: 30px; }
   white-space:nowrap;
 }
 
-.chip-actions{ display:none; gap:4px; }
+.chip-actions{ display:none; gap:4px; flex: 0 0 auto; }
 body.is-editor .chip-actions{ display:flex; }
 
 .pill-btn{
@@ -470,6 +481,25 @@ body.is-editor .add-participant{ display:flex; }
 .team-field.right{ text-align:right; }
 .team-field:focus{ outline:none; border-bottom-color: var(--flag); }
 
+select.team-field{
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  padding-right: 20px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--chalk-dim) 50%),
+    linear-gradient(135deg, var(--chalk-dim) 50%, transparent 50%);
+  background-position: right 4px top 55%, right 9px top 55%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+select.team-field option{
+  background: var(--field-dark);
+  color: var(--chalk);
+}
+select.team-field:disabled{ cursor: default; }
+
 .score-field{
   font-family:'Anton', sans-serif;
   font-size: 30px;
@@ -534,8 +564,18 @@ body.is-editor .add-participant{ display:flex; }
   border-bottom: 1px solid var(--line);
 }
 
+@media (max-width: 780px){
+  .home-columns{ grid-template-columns: 1fr; gap: 0; }
+  .home-col:first-child{
+    border-right: none;
+    padding-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 26px;
+    margin-bottom: 26px;
+  }
+}
+
 @media (max-width: 560px){
-  .mug-chip{ width: 100%; }
   .chip-name{ max-width: none; flex:1; }
 
   .matchup-card{ padding: 16px 14px; margin-bottom: 14px; }
@@ -608,21 +648,20 @@ body.is-editor .add-participant{ display:flex; }
 
 <main class="wrap">
   <div class="panel active" id="panel-home">
-    <div class="section-title">League Standings</div>
-    <div class="section-desc">// records update automatically from your weekly recaps.</div>
+    <div class="home-columns">
+      <div class="home-col">
+        <div class="section-title">League Standings</div>
+        <div id="standingsWrap"></div>
+      </div>
 
-    <div id="standingsWrap"></div>
-
-    <hr class="rule">
-
-    <div class="section-title">Beer Mile Leaderboard</div>
-    <div class="section-desc">// one mug per mile owed. tap + when a debt gets paid.</div>
-
-    <div class="mug-board" id="leaderboard"></div>
-
-    <div class="add-participant">
-      <input type="text" id="newParticipant" class="lock-field" readonly placeholder="Add a league member&hellip;" maxlength="40">
-      <button class="btn-primary lock-action" id="addParticipantBtn" disabled>Add</button>
+      <div class="home-col">
+        <div class="section-title">Beer Mile Leaderboard</div>
+        <div class="mug-board" id="leaderboard"></div>
+        <div class="add-participant">
+          <input type="text" id="newParticipant" class="lock-field" readonly placeholder="Add a league member&hellip;" maxlength="40">
+          <button class="btn-primary lock-action" id="addParticipantBtn" disabled>Add</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -645,6 +684,29 @@ body.is-editor .add-participant{ display:flex; }
   const tabsInner = document.getElementById('tabsInner');
   const weekPanelsRoot = document.getElementById('weekPanels');
   const leaderboardEl = document.getElementById('leaderboard');
+
+  // The 12 team names owners draft under. Matchup dropdowns are built from
+  // this list so standings always match teams exactly — no typos, no
+  // "Mud Hens" vs "The Mud Hens" mismatches.
+  const TEAM_NAMES = [
+    'Baby #3 Coming March 2027',
+    'Immaculate Concepcion',
+    'Bite some kneecaps',
+    'Madden Craver',
+    'Dwayne "The Brock" Johnson',
+    'Flipadelphia Iggles',
+    'Shivakamini Somakandarkram',
+    'Team Con Air',
+    'Gibby',
+    'Luckier Kevin',
+    'Diamond Dogs',
+    'Back to DecemBurrow'
+  ];
+
+  function teamOptionsHtml(){
+    return '<option value="">Select team&hellip;</option>' +
+      TEAM_NAMES.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+  }
 
   // ---------- Data model ----------
   // Everything lives in one in-memory object. On your PC it's mirrored into
@@ -729,7 +791,10 @@ body.is-editor .add-participant{ display:flex; }
   let isEditor = false;
 
   function applyLockState(){
-    document.querySelectorAll('.lock-field').forEach(el => { el.readOnly = !isEditor; });
+    document.querySelectorAll('.lock-field').forEach(el => {
+      if(el.tagName === 'SELECT'){ el.disabled = !isEditor; }
+      else{ el.readOnly = !isEditor; }
+    });
     document.querySelectorAll('.lock-action').forEach(el => { el.disabled = !isEditor; });
     document.body.classList.toggle('is-editor', isEditor);
     const btn = document.getElementById('lockToggleBtn');
@@ -860,12 +925,6 @@ body.is-editor .add-participant{ display:flex; }
   homeTabBtn.dataset.target = 'panel-home';
   tabsInner.appendChild(homeTabBtn);
 
-  const rulesTabBtn = document.createElement('button');
-  rulesTabBtn.className = 'tab-btn';
-  rulesTabBtn.textContent = 'RULES';
-  rulesTabBtn.dataset.target = 'panel-rules';
-  tabsInner.appendChild(rulesTabBtn);
-
   for(let w=1; w<=TOTAL_WEEKS; w++){
     const btn = document.createElement('button');
     btn.className = 'tab-btn';
@@ -873,6 +932,12 @@ body.is-editor .add-participant{ display:flex; }
     btn.dataset.target = 'panel-week-' + w;
     tabsInner.appendChild(btn);
   }
+
+  const rulesTabBtn = document.createElement('button');
+  rulesTabBtn.className = 'tab-btn';
+  rulesTabBtn.textContent = 'RULES';
+  rulesTabBtn.dataset.target = 'panel-rules';
+  tabsInner.appendChild(rulesTabBtn);
 
   tabsInner.addEventListener('click', (e)=>{
     const btn = e.target.closest('.tab-btn');
@@ -898,11 +963,11 @@ body.is-editor .add-participant{ display:flex; }
       <div class="matchup-card" data-game="${g}">
         <div class="game-label">Game ${g} of ${GAMES_PER_WEEK}</div>
         <div class="scoreboard">
-          <input class="team-field lock-field" readonly data-field="teamA" placeholder="Team name" maxlength="30">
+          <select class="team-field lock-field" disabled data-field="teamA">${teamOptionsHtml()}</select>
           <input class="score-field lock-field" readonly data-field="scoreA" placeholder="0" inputmode="decimal">
           <div class="vs-mark">VS</div>
           <input class="score-field lock-field" readonly data-field="scoreB" placeholder="0" inputmode="decimal">
-          <input class="team-field right lock-field" readonly data-field="teamB" placeholder="Team name" maxlength="30">
+          <select class="team-field right lock-field" disabled data-field="teamB">${teamOptionsHtml()}</select>
         </div>
         <div class="recap-label">The Recap</div>
         <textarea class="recap-text lock-field" readonly data-field="recap" placeholder="How'd it go? Any last-second heroics, waiver-wire heists, or bench blunders worth recording for the league record?"></textarea>
