@@ -53,16 +53,14 @@ header.masthead::before, header.masthead::after{
 header.masthead::before{ left: 8px; }
 header.masthead::after{ right: 8px; }
 
-.lock-bar{
-  position:absolute;
-  top: 16px;
-  right: 30px;
-  z-index: 5;
+.bottom-bar{
   display:flex;
-  gap: 8px;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  max-width: 70%;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 20px 40px;
+  border-top: 2px solid var(--flag);
+  margin-top: 20px;
 }
 .lock-btn{
   font-family:'Space Mono', monospace;
@@ -605,8 +603,7 @@ select.team-field:disabled{ cursor: default; }
   .recap-text{ min-height: 200px; }
 
   .standings-table th, .standings-table td{ padding: 8px 6px; font-size: 13px; }
-  .lock-bar{ position: static; justify-content:center; margin-bottom: 14px; max-width: none; }
-  header.masthead{ padding-top: 20px; }
+  .bottom-bar{ padding: 20px 16px 32px; }
 }
 
 :focus-visible{ outline: 2px solid var(--flag-bright); outline-offset: 2px; }
@@ -615,14 +612,6 @@ select.team-field:disabled{ cursor: default; }
 <body>
 
 <header class="masthead">
-  <div class="lock-bar">
-    <button class="lock-btn viewer-only" id="refreshBtn" type="button" title="Check for newly published data">&#8635; Refresh</button>
-    <button class="lock-btn editor-only" id="exportBtn" type="button">&#8681; Export JSON<span class="dirty-dot" id="dirtyDot"></span></button>
-    <button class="lock-btn editor-only" id="importBtn" type="button">&#8679; Import JSON</button>
-    <button class="lock-btn editor-only" id="resetBtn" type="button">&#8634; Reset to published</button>
-    <input type="file" id="importFile" accept="application/json" style="display:none">
-    <button class="lock-btn" id="lockToggleBtn" type="button">🔒 Commissioner login</button>
-  </div>
   <div class="eyebrow">Est. this season &middot; every loss remembered</div>
   <div class="league-name">THE LEAGUE <span>LEDGER</span></div>
   <div class="sub">Mile High Club</div>
@@ -677,6 +666,15 @@ select.team-field:disabled{ cursor: default; }
   <!-- Week panels injected by JS -->
   <div id="weekPanels"></div>
 </main>
+
+<footer class="bottom-bar">
+  <button class="lock-btn viewer-only" id="refreshBtn" type="button" title="Check for newly published data">&#8635; Refresh</button>
+  <button class="lock-btn editor-only" id="exportBtn" type="button">&#8681; Export JSON<span class="dirty-dot" id="dirtyDot"></span></button>
+  <button class="lock-btn editor-only" id="importBtn" type="button">&#8679; Import JSON</button>
+  <button class="lock-btn editor-only" id="resetBtn" type="button">&#8634; Reset to published</button>
+  <input type="file" id="importFile" accept="application/json" style="display:none">
+  <button class="lock-btn" id="lockToggleBtn" type="button">🔒 Commissioner login</button>
+</footer>
 
 <script>
 (function(){
