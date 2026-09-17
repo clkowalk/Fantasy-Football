@@ -602,7 +602,7 @@ select.team-field:disabled{ cursor: default; }
     margin: 0;
   }
 
-  .recap-text{ min-height: 100px; }
+  .recap-text{ min-height: 200px; }
 
   .standings-table th, .standings-table td{ padding: 8px 6px; font-size: 13px; }
   .lock-bar{ position: static; justify-content:center; margin-bottom: 14px; max-width: none; }
@@ -775,10 +775,8 @@ select.team-field:disabled{ cursor: default; }
       el.textContent = isDirty
         ? 'Local draft has unexported changes — export, then commit data.json to publish.'
         : 'Local draft matches your last export.';
-    }else if(dataSource === 'published'){
-      el.textContent = '';
     }else{
-      el.textContent = 'No published data.json found yet.';
+      el.textContent = '';
     }
   }
 
